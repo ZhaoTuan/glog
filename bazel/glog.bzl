@@ -63,6 +63,7 @@ def glog_library(namespace = "google", with_gflags = 1, **kwargs):
         "-Wno-unused-function",
         "-Wno-unused-local-typedefs",
         "-Wno-unused-variable",
+        "-DGLOG_EXPORT=__attribute__((visibility(\\\"default\\\")))",
         # Allows src/base/mutex.h to include pthread.h.
         "-DHAVE_PTHREAD",
         # Allows src/logging.cc to determine the host name.
@@ -78,6 +79,7 @@ def glog_library(namespace = "google", with_gflags = 1, **kwargs):
     ]
 
     linux_or_darwin_copts = wasm_copts + [
+        "-DGLOG_EXPORT=__attribute__((visibility(\\\"default\\\")))",
         # For src/utilities.cc.
         "-DHAVE_SYS_SYSCALL_H",
         # For src/logging.cc to create symlinks.
@@ -87,6 +89,7 @@ def glog_library(namespace = "google", with_gflags = 1, **kwargs):
     freebsd_only_copts = [
         # Enable declaration of _Unwind_Backtrace
         "-D_GNU_SOURCE",
+        "-DGLOG_EXPORT=__attribute__((visibility(\\\"default\\\")))",
     ]
 
     darwin_only_copts = [
@@ -150,15 +153,16 @@ def glog_library(namespace = "google", with_gflags = 1, **kwargs):
         ],
         strip_include_prefix = "src",
         defines = select({
-            # GOOGLE_GLOG_DLL_DECL is normally set by export.h, but that's not
+            # GLOG_EXPORT is normally set by export.h, but that's not
             # generated for Bazel.
             "@bazel_tools//src/conditions:windows": [
-                "GOOGLE_GLOG_DLL_DECL=__declspec(dllexport)",
+                "GLOG_EXPORT=__declspec(dllexport)",
                 "GLOG_DEPRECATED=__declspec(deprecated)",
                 "GLOG_NO_ABBREVIATED_SEVERITIES",
             ],
             "//conditions:default": [
                 "GLOG_DEPRECATED=__attribute__((deprecated))",
+                "GLOG_EXPORT=__attribute__((visibility(\\\"default\\\")))",
             ],
         }),
         copts =
