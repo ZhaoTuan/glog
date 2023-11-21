@@ -404,6 +404,7 @@ class LogFileObject : public base::Logger {
   void SetBasename(const char* basename);
   void SetExtension(const char* ext);
   void SetSymlinkBasename(const char* symlink_basename);
+  std::string LogFileObject::GetLogFileName();
 
   // Normal flushing routine
   virtual void Flush();
@@ -426,6 +427,7 @@ class LogFileObject : public base::Logger {
   Mutex lock_;
   bool base_filename_selected_;
   string base_filename_;
+  string file_path_;
   string symlink_basename_;
   string filename_extension_;     // option users can specify (eg to add port#)
   FILE* file_;
@@ -453,6 +455,8 @@ class LogDestination {
   // These methods are just forwarded to by their global versions.
   static void SetLogDestination(LogSeverity severity,
 				const char* base_filename);
+  static std::string GetLogFileName(LogSeverity severity);
+
   static void SetLogSymlink(LogSeverity severity,
                             const char* symlink_basename);
   static void AddLogSink(LogSink *destination);
@@ -597,6 +601,15 @@ inline void LogDestination::SetLogDestination(LogSeverity severity,
   // all this stuff.
   MutexLock l(&log_mutex);
   log_destination(severity)->fileobject_.SetBasename(base_filename);
+}
+
+inline std::string LogDestination::GetLogFileName(LogSeverity severity)
+{  
+  assert(severity >= 0 && severity < NUM_SEVERITIES);
+  // Prevent any subtle race conditions by wrapping a mutex lock around
+  // all this stuff.
+  MutexLock l(&log_mutex);
+  return log_destination(severity)->fileobject_.GetLogFileName();
 }
 
 inline void LogDestination::SetLogSymlink(LogSeverity severity,
@@ -824,6 +837,7 @@ LogFileObject::LogFileObject(LogSeverity severity,
                              const char* base_filename)
   : base_filename_selected_(base_filename != NULL),
     base_filename_((base_filename != NULL) ? base_filename : ""),
+    file_path_(""),
     symlink_basename_(glog_internal_namespace_::ProgramInvocationShortName()),
     filename_extension_(),
     file_(NULL),
@@ -876,6 +890,11 @@ void LogFileObject::SetSymlinkBasename(const char* symlink_basename) {
   symlink_basename_ = symlink_basename;
 }
 
+std::string LogFileObject::GetLogFileName() {
+  MutexLock l(&lock_);
+  return file_path_;
+}
+
 void LogFileObject::Flush() {
   MutexLock l(&lock_);
   FlushUnlocked();
@@ -893,8 +912,9 @@ void LogFileObject::FlushUnlocked(){
 }
 
 bool LogFileObject::CreateLogfile(const string& time_pid_string) {
-  string string_filename = base_filename_+filename_extension_+
-                           time_pid_string;
+  string string_filename = base_filename_+
+                           time_pid_string + filename_extension_;
+
   const char* filename = string_filename.c_str();
   int fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0664);
   if (fd == -1) return false;
@@ -909,6 +929,7 @@ bool LogFileObject::CreateLogfile(const string& time_pid_string) {
     unlink(filename);  // Erase the half-baked evidence: an unusable log file
     return false;
   }
+  file_path_ = string_filename;
 
   // We try to create a symlink called <program_name>.<severity>,
   // which is easier to use.  (Every time we create a new logfile,
