@@ -1626,6 +1626,10 @@ void SetLogSymlink(LogSeverity severity, const char* symlink_basename) {
   LogDestination::SetLogSymlink(severity, symlink_basename);
 }
 
+std::string GetLogFileName(LogSeverity severity) {
+  return LogDestination::GetLogFileName(severity);
+}
+
 LogSink::~LogSink() {
 }
 
